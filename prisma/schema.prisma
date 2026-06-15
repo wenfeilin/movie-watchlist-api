@@ -1,0 +1,74 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+
+
+// REMEMBER: WHENEVER CHANGE IS MADE TO THIS FILE, MIGRATE CHANGES AND GENERATE TYPES AGAIN!!
+
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../src/generated/prisma" otherwise it outputs types in files
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// USER -> MOVIE -> WATCHLIST (user creates movie, user creates watchlist which contains movies)
+
+// Create table by creating model defined as obj
+model User {
+  id       String @id @default(uuid()) // id must have @id declaraction and the uuid generation as default value so it's unique; uuid = standard of ids used in APIs and dbs
+  name     String
+  email    String @unique // no two emails should be same
+  password String
+
+  createdAt DateTime @default(now()) // when user was created; default = curr time since user created just joined
+
+  // Relations
+  movies Movie[] @relation("MovieCreator") // list of movies created by user
+  watchlistItems WatchlistItem[] // list of watchlist items on watchlist of user?
+}
+
+model Movie {
+  id          String   @id @default(uuid())
+  title       String
+  overview    String? // for optional
+  releaseYear Int
+  genres      String[] @default([])
+  runtime     Int?
+  posterUrl   String?
+  createdBy   String // foreign key (from User table)
+  createdAt   DateTime @default(now())
+
+  creator User  @relation("MovieCreator", fields: [createdBy], references: [id], onDelete: Cascade) // should delete leftover movies from deleted user; "MovieCreator" is alias to reference this field elsewhere?
+  watchlistItems WatchlistItem[] // list of watchlists that include this movie on them
+}
+
+model WatchlistItem {
+  id        String          @id @default(uuid())
+  userId    String // foreign key (from User table)
+  movieId   String // foreign key (from Movie table)
+  status    WatchlistStatus @default(PLANNED) // custom type; define as `enum` (defined below) = options/fixed values
+  rating    Int?
+  notes     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @default(now())
+
+  // Relations (foreign keys): create references to User and Movie tables
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // id field from User table references userId field in WatchlistItem table and when user gets deleted, watchlist created by them should also get deleted so that there is no leftover data stored when a user deletes their acc
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade) // if movie gets deleted, so should the watchlist item referencing it
+
+  @@unique([userId, movieId]) // composite primary key (the combo of user id and movie id is always unique)
+}
+
+enum WatchlistStatus {
+  PLANNED
+  WATCHING
+  COMPLETED
+  DROP
+}
